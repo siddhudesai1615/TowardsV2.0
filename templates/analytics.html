@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .insight-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); height: 100%; }
+    .strong-point { border-top: 4px solid #27ae60; }
+    .weak-point { border-top: 4px solid #e74c3c; }
+    .chart-container { position: relative; height: 300px; width: 100%; }
+</style>
+
+<!-- Top Statistics Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h3 class="fw-bold mb-1">Your Consistency Report</h3>
+        <div class="mt-2">
+            <span class="badge bg-info text-dark fs-6 me-2">Weekly: {{ overall_week }}%</span>
+            <span class="badge bg-secondary fs-6 me-2">Monthly: {{ overall_month }}%</span>
+            <span class="badge bg-primary fs-6">All-Time: {{ overall_all }}%</span>
+        </div>
+    </div>
+</div>
+
+<!-- Suggestions Engine -->
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="insight-card strong-point">
+            <h5 class="fw-bold text-success">🏆 Strong Points (>80%)</h5>
+            <p class="text-muted small">You are crushing these habits. Keep it up!</p>
+            <ul>
+                {% for item in strong_points %}
+                    <li>{{ item }}</li>
+                {% else %}
+                    <li class="text-muted list-unstyled">Need more data to find strong points.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="insight-card weak-point">
+            <h5 class="fw-bold text-danger">⚠️ Weak Points (<50%)</h5>
+            <p class="text-muted small">These tasks are slipping. Consider adjusting them.</p>
+            <ul>
+                {% for item in weak_points %}
+                    <li>{{ item }}</li>
+                {% else %}
+                    <li class="text-muted list-unstyled">No weak points! You're doing great.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row">
+    <!-- Line Chart: Dynamic Trend Progress -->
+    <div class="col-md-6 mb-4">
+        <div class="insight-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">Trend History</h5>
+                <select id="timeframeSelect" class="form-select form-select-sm w-auto shadow-sm">
+                    <option value="7">Past 7 Days</option>
+                    <option value="30">Past 30 Days</option>
+                    <option value="all">Till Date</option>
+                </select>
+            </div>
+            <div class="chart-container">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bar Chart: Individual Task Consistency -->
+    <div class="col-md-6 mb-4">
+        <div class="insight-card">
+            <h5 class="fw-bold mb-3">Individual Task Consistency</h5>
+            <div class="chart-container">
+                <canvas id="taskChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Task Breakdown Table -->
+<div class="row mb-4 mt-2">
+    <div class="col-12">
+        <div class="insight-card p-4">
+            <h5 class="fw-bold mb-3">Detailed Task Breakdown</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Task Objective</th>
+                            <th>Past 7 Days</th>
+                            <th>Past 30 Days</th>
+                            <th>Till Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in task_stats %}
+                        <tr>
+                            <td class="fw-bold">{{ task.title }}</td>
+                            <td>{{ task.cons_week }}%</td>
+                            <td>{{ task.cons_month }}%</td>
+                            <td>{{ task.cons_all }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Initialize Chart.js -->
+<script>
+    const maxTasks = {{ total_tasks }};
+    
+    // Store all datasets from Python safely
+    const chartData = {
+        '7': { labels: {{ labels_7 | tojson }}, data: {{ data_7 | tojson }} },
+        '30': { labels: {{ labels_30 | tojson }}, data: {{ data_30 | tojson }} },
+        'all': { labels: {{ labels_all | tojson }}, data: {{ data_all | tojson }} }
+    };
+
+    const taskStats = {{ task_stats | tojson }};
+    const taskTitles = taskStats.map(t => t.title);
+    const taskConsistencies = taskStats.map(t => t.consistency);
+
+    // 1. Dynamic Line Chart
+    const ctxTrend = document.getElementById('trendChart').getContext('2d');
+    let trendChart = new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels: chartData['7'].labels,
+            datasets: [{
+                label: 'Tasks Completed',
+                data: chartData['7'].data,
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, max: maxTasks, ticks: { stepSize: 1 } } }
+        }
+    });
+
+    // Dropdown Event Listener to update chart seamlessly
+    document.getElementById('timeframeSelect').addEventListener('change', function(e) {
+        const selected = e.target.value;
+        trendChart.data.labels = chartData[selected].labels;
+        trendChart.data.datasets[0].data = chartData[selected].data;
+        trendChart.update();
+    });
+
+    // 2. Bar Chart
+    const ctxTask = document.getElementById('taskChart').getContext('2d');
+    new Chart(ctxTask, {
+        type: 'bar',
+        data: {
+            labels: taskTitles,
+            datasets: [{
+                label: 'Consistency %',
+                data: taskConsistencies,
+                backgroundColor: '#27ae60',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, max: 100 } }
+        }
+    });
+</script>
+{% endblock %}

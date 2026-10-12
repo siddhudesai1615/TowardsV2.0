@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    /* Feel-Good UI Styling */
+    .stat-card { background: white; border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .stat-value { font-size: 1.8rem; font-weight: bold; color: #2c3e50; }
+    .stat-label { font-size: 0.85rem; color: #6c757d; text-transform: uppercase; letter-spacing: 1px; }
+    
+    .task-card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: all 0.3s ease; border-left: 4px solid #dee2e6; display: flex; align-items: center; justify-content: space-between; }
+    .task-card.priority { border-left-color: #f39c12; }
+    .task-card.completed { opacity: 0.6; border-left-color: #27ae60; background-color: #f8f9fa;}
+    .task-card.completed .task-title { text-decoration: line-through; color: #95a5a6; }
+    
+    .custom-checkbox { width: 1.8em; height: 1.8em; cursor: pointer; border-radius: 6px; border: 2px solid #ced4da; transition: all 0.2s; margin-top: 0;}
+    .custom-checkbox:checked { background-color: #27ae60; border-color: #27ae60; transform: scale(1.1); }
+    
+    .quote-banner { background-color: #e8f4f8; color: #2c3e50; border-radius: 10px; padding: 15px; font-style: italic; text-align: center; margin-bottom: 25px; }
+</style>
+
+<!-- Top Statistics Row -->
+<div class="row mb-4">
+    <div class="col-md-3 col-6 mb-3"><div class="stat-card"><div class="stat-value">{{ tasks|length }}</div><div class="stat-label">Total Tasks</div></div></div>
+    <div class="col-md-3 col-6 mb-3"><div class="stat-card"><div class="stat-value text-danger">{{ remaining }}</div><div class="stat-label">Remaining</div></div></div>
+    <div class="col-md-3 col-6 mb-3"><div class="stat-card"><div class="stat-value text-success">{{ completed }}</div><div class="stat-label">Completed</div></div></div>
+    <div class="col-md-3 col-6 mb-3"><div class="stat-card"><div class="stat-value text-primary">{{ avg_consistency }}%</div><div class="stat-label">Avg Consistency</div></div></div>
+</div>
+
+<div class="quote-banner">"{{ quote }}"</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0 fw-bold">Today's Timetable</h4>
+    <button class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#addTaskModal">+ Add Task</button>
+</div>
+
+<div id="task-list">
+    <!-- Load uncompleted tasks first -->
+    {% for task in tasks if not task.completed_today %}
+    <div class="task-card {% if task.is_priority %}priority{% endif %}" id="card-{{ task.id }}">
+        <div class="d-flex align-items-center">
+            <input type="checkbox" class="form-check-input custom-checkbox me-3" data-task-id="{{ task.id }}">
+            <div>
+                <div class="task-title fw-bold">{{ task.title }} {% if task.is_priority %}(Focus){% endif %}</div>
+                <small class="text-muted">Streak: {{ task.streak }} days {% if task.streak > 0 %}🔥{% endif %}</small>
+            </div>
+        </div>
+        <form method="POST" action="{{ url_for('delete_task', task_id=task.id) }}" style="margin: 0;">
+            <button type="submit" class="btn btn-sm text-danger border-0 bg-transparent">✖</button>
+        </form>
+    </div>
+    {% endfor %}
+
+    <!-- Load completed tasks at the bottom -->
+    {% for task in tasks if task.completed_today %}
+    <div class="task-card completed {% if task.is_priority %}priority{% endif %}" id="card-{{ task.id }}">
+        <div class="d-flex align-items-center">
+            <input type="checkbox" class="form-check-input custom-checkbox me-3" data-task-id="{{ task.id }}" checked>
+            <div>
+                <div class="task-title fw-bold">{{ task.title }} {% if task.is_priority %}(Focus){% endif %}</div>
+                <small class="text-muted">Done for today | Streak: {{ task.streak }} days 🔥</small>
+            </div>
+        </div>
+        <form method="POST" action="{{ url_for('delete_task', task_id=task.id) }}" style="margin: 0;">
+            <button type="submit" class="btn btn-sm text-danger border-0 bg-transparent">✖</button>
+        </form>
+    </div>
+    {% endfor %}
+    
+    {% if not tasks %}
+    <p class="text-center text-muted mt-5">Your timetable is empty. Click "+ Add Task" to begin building your routine!</p>
+    {% endif %}
+</div>
+
+<!-- ADD TASK MODAL -->
+<div class="modal fade" id="addTaskModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('add_task') }}">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">New Daily Task</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small text-uppercase">Task Objective</label>
+                        <input type="text" name="title" class="form-control form-control-lg" placeholder="e.g., Read 20 pages" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label text-muted small text-uppercase">End Date (Optional)</label>
+                        <input type="date" name="end_date" class="form-control">
+                        <small class="text-muted">Leave blank if this is a permanent daily habit.</small>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" name="is_priority" id="prioritySwitch">
+                        <label class="form-check-label fw-bold" for="prioritySwitch">Mark as Today's Focus</label>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="submit" class="btn btn-primary w-100">Add to Timetable</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- DANGER ZONE: Reset Account -->
+<div class="mt-5 mb-4 text-center">
+    <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#resetModal">
+        ⚠️ Reset Account History
+    </button>
+</div>
+
+<!-- RESET CONFIRMATION MODAL -->
+<div class="modal fade" id="resetModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger">Reset Account?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to wipe all your tasks, streaks, and analytics data? 
+                Your login credentials will remain, but <strong>this data wipe cannot be undone.</strong>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('reset_account') }}" class="m-0">
+                    <button type="submit" class="btn btn-danger">Yes, start fresh</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- JAVASCRIPT FOR CHECKBOX INTERACTION -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const checkboxes = document.querySelectorAll('.custom-checkbox');
+    const taskList = document.getElementById('task-list');
+
+    checkboxes.forEach(box => {
+        box.addEventListener('change', async function() {
+            const taskId = this.dataset.taskId;
+            const card = document.getElementById(`card-${taskId}`);
+            const statusText = card.querySelector('small');
+            
+            try {
+                // Send silent background request to Python API
+                const response = await fetch(`/toggle_task/${taskId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    if (data.is_completed) {
+                        card.classList.add('completed');
+                        statusText.innerText = "Done for today";
+                        // Smoothly move to bottom
+                        taskList.appendChild(card); 
+                    } else {
+                        card.classList.remove('completed');
+                        statusText.innerText = "Reopened";
+                        // Smoothly move to top
+                        taskList.prepend(card); 
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to update task", err);
+                this.checked = !this.checked; // Revert if failed
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

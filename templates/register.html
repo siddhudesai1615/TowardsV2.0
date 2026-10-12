@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card p-4 mt-5">
+            <h3 class="text-center mb-4">Create Account</h3>
+            <form method="POST" action="{{ url_for('register') }}">
+                <div class="mb-3">
+                    <label>Username</label>
+                    <input type="text" name="username" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label>Password</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <hr>
+                <p class="text-muted small">Security question (Used if you forget your password)</p>
+                <div class="mb-3">
+                    <label>Custom Question (e.g., Childhood pet?)</label>
+                    <input type="text" name="sec_question" class="form-control" required>
+                </div>
+                <div class="mb-4">
+                    <label>Answer</label>
+                    <input type="text" name="sec_answer" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Register</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
